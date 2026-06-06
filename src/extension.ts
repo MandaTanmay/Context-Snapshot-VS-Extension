@@ -1,6 +1,28 @@
 import * as vscode from 'vscode';
 
 /**
+ * Interface for open file data
+ */
+interface OpenFileData {
+	path: string;
+	content: string;
+	languageId: string;
+	isDirty: boolean;
+	cursorLine: number;
+	cursorColumn: number;
+}
+
+/**
+ * Interface for diagnostic data
+ */
+interface DiagnosticData {
+	file: string;
+	line: number;
+	severity: 'Error' | 'Warning';
+	message: string;
+}
+
+/**
  * Extension activation point
  * Called when the command is first invoked
  */
@@ -31,9 +53,20 @@ async function captureContextSnapshot() {
 		const timestamp = new Date().toISOString();
 		const workspaceInfo = getWorkspaceInfo();
 		const vsCodeVersion = vscode.version;
-		const openFilesData = await collectOpenFiles();
+		const openFilesData = collectOpenFiles();
 		const diagnosticsData = collectDiagnostics();
+		
+		diagnosticsData.sort((a, b) => {
+			if (a.severity === b.severity) return a.file.localeCompare(b.file);
+			return a.severity === 'Error' ? -1 : 1;
+		});
+
 		const terminalInfo = getActiveTerminalInfo();
+
+		if (openFilesData.length === 0 && diagnosticsData.length === 0) {
+			vscode.window.showWarningMessage('Nothing to snapshot — open at least one file first.');
+			return;
+		}
 
 		// Build the markdown snapshot
 		const markdown = buildMarkdownSnapshot(
@@ -49,7 +82,7 @@ async function captureContextSnapshot() {
 		await vscode.env.clipboard.writeText(markdown);
 
 		// Show success message
-		vscode.window.showInformationMessage('Context snapshot copied to clipboard!');
+		vscode.window.showInformationMessage(`Context snapshot copied! (${openFilesData.length} files, ${diagnosticsData.length} issues)`);
 
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -76,25 +109,32 @@ function getWorkspaceInfo(): { name: string; path: string } | null {
 /**
  * Collect all open file data including content, cursor position, and dirty status
  */
-async function collectOpenFiles(): Promise<OpenFileData[]> {
+function collectOpenFiles(): OpenFileData[] {
 	const openFiles: OpenFileData[] = [];
+	const MAX_LINES = 200;
 
-	// Iterate through all visible text editors
-	for (const editor of vscode.window.visibleTextEditors) {
-		const document = editor.document;
-		const selection = editor.selection;
-
+	// Iterate through all text documents
+	const allDocs = vscode.workspace.textDocuments;
+	for (const document of allDocs) {
 		// Skip unsupported schemes (like output panels, untitled, etc.)
 		if (document.uri.scheme !== 'file') {
 			continue;
 		}
 
+		// Get cursor from active editor if it matches, else default to 1,1
+		const activeEditor = vscode.window.visibleTextEditors.find(
+			e => e.document.uri.toString() === document.uri.toString()
+		);
+		const cursorLine = activeEditor ? activeEditor.selection.active.line + 1 : 1;
+		const cursorColumn = activeEditor ? activeEditor.selection.active.character + 1 : 1;
+
 		const relativePath = vscode.workspace.asRelativePath(document.uri);
-		const content = document.getText();
+		const lines = document.getText().split('\n');
+		const content = lines.length > MAX_LINES
+			? lines.slice(0, MAX_LINES).join('\n') + `\n\n// ... (${lines.length - MAX_LINES} more lines truncated)`
+			: document.getText();
 		const languageId = document.languageId;
 		const isDirty = document.isDirty;
-		const cursorLine = selection.active.line + 1; // Convert to 1-based line numbers
-		const cursorColumn = selection.active.character + 1; // Convert to 1-based columns
 
 		openFiles.push({
 			path: relativePath,
@@ -207,8 +247,10 @@ function buildMarkdownSnapshot(
 		markdown += '| File | Line | Severity | Message |\n';
 		markdown += '|------|------|----------|----------|\n';
 		for (const diag of diagnosticsData) {
-			// Escape pipe characters in the message
-			const escapedMessage = diag.message.replace(/\|/g, '\\|');
+			// Escape pipe characters and replace newlines in the message
+			const escapedMessage = diag.message
+				.replace(/\|/g, '\\|')
+				.replace(/\n/g, ' ');
 			markdown += `| ${diag.file} | ${diag.line} | ${diag.severity} | ${escapedMessage} |\n`;
 		}
 		markdown += '\n';
@@ -231,24 +273,3 @@ function buildMarkdownSnapshot(
 	return markdown;
 }
 
-/**
- * Interface for open file data
- */
-interface OpenFileData {
-	path: string;
-	content: string;
-	languageId: string;
-	isDirty: boolean;
-	cursorLine: number;
-	cursorColumn: number;
-}
-
-/**
- * Interface for diagnostic data
- */
-interface DiagnosticData {
-	file: string;
-	line: number;
-	severity: 'Error' | 'Warning';
-	message: string;
-}
