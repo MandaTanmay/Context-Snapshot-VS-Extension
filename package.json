@@ -1,0 +1,59 @@
+{
+  "name": "context-snapshot",
+  "displayName": "Context Snapshot",
+  "description": "One command that packages your open files, cursor position, recent errors, and terminal output into a shareable markdown snapshot.",
+  "version": "0.0.1",
+  "publisher": "contextSnapshot",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "contextSnapshot.capture",
+        "title": "Snapshot Context"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "contextSnapshot.capture",
+        "key": "ctrl+shift+alt+s",
+        "mac": "cmd+shift+alt+s",
+        "when": "editorFocus || !editorFocus"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "^18.0.0",
+    "typescript": "^5.1.0",
+    "@vscode/vsce": "^2.19.0"
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/context-snapshot.git"
+  },
+  "keywords": [
+    "context",
+    "snapshot",
+    "debug",
+    "diagnostics",
+    "terminal"
+  ]
+}
