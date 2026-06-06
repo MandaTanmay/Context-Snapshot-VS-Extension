@@ -2,7 +2,6 @@
 
 One command that packages your open files, cursor position, recent errors, and terminal output into a shareable markdown snapshot.
 
-**GitHub:** https://github.com/YOUR_USERNAME/context-snapshot
 
 ## Features
 
